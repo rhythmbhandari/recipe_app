@@ -96,6 +96,7 @@ function openIndexedDB() {
   });
 }
 
+
 function getRecipesFromIndexedDB(db) {
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(["activeRecipe"], "readwrite");
@@ -109,11 +110,15 @@ function getRecipesFromIndexedDB(db) {
 
 async function updateRecipeInFirestore(recipe) {
   try {
-    const isSuccess = await recipeDB.setActiveRecipe(recipe.recipe, recipe.userId);
-    if (isSuccess) {
-      console.log("Recipe successfully updated in Firestore:", recipe.recipe);
-    } else {
-      throw new Error("Failed to update recipe in Firestore");
+    console.log(recipe.sync)
+    if(recipe.sync != undefined && recipe.sync == false){
+      const isSuccess = await recipeDB.setActiveRecipe(recipe.recipe, recipe.userId);
+      if (isSuccess) {
+        console.log("Recipe successfully updated in Firestore:", recipe.recipe);
+        setActiveRecipeInIndexedDB(recipe.recipe, recipe.userId, true);
+      } else {
+        throw new Error("Failed to update recipe in Firestore");
+      }
     }
   } catch (error) {
     console.error("Error updating recipe in Firestore:", error);
@@ -445,7 +450,7 @@ function startRecipeBtnClicked(prepTime, recipeTitle, recipe) {
       cancelAllNotifications();
 
       if (!navigator.onLine) {
-        setActiveRecipeInIndexedDB(recipe, auth.currentUser.uid);
+        setActiveRecipeInIndexedDB(recipe, auth.currentUser.uid, false);
         const timeoutId = setTimeout(() => {
           const options = {
             body: `Your prep timer for ${recipeTitle} has started.`,
@@ -500,10 +505,10 @@ async function setActiveRecipeInFirestore(newRecipeData) {
   });
 }
 
-async function setActiveRecipeInIndexedDB(newRecipeData, userId) {
+async function setActiveRecipeInIndexedDB(newRecipeData, userId, sync) {
   const transaction = dbIndexedDB.transaction(["activeRecipe"], "readwrite");
   const store = transaction.objectStore("activeRecipe");
-  let dd = { userId: userId, recipe: newRecipeData };
+  let dd = { userId: userId, recipe: newRecipeData, sync: sync};
   store.put(dd);
 }
 
