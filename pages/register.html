@@ -1,0 +1,38 @@
+<ons-page>
+    <ons-toolbar>
+        <div class="center">Register</div>
+    </ons-toolbar>
+    <form>
+        <label>Email:</label>
+        <ons-input id="new-email" type="email" placeholder="Please enter email" modifier="underbar" float
+            style="margin-top: 10px; margin-bottom: 10px;"></ons-input>
+        <label>Password:</label>
+        <ons-input id="new-password" type="password" placeholder="Please enter password" modifier="underbar" float
+            style="margin-top: 10px; margin-bottom: 20px;"></ons-input>
+        <label>Role:</label>
+        <ons-list style="margin-top: 10px; margin-bottom: 10px;">
+            <ons-list-item tappable>
+                <label class="left">
+                    <ons-radio name="role" input-id="rd-1" checked></ons-radio>
+                </label>
+                <label for="rd-1" class="center">
+                    Student
+                </label>
+            </ons-list-item>
+            <ons-list-item tappable>
+                <label class="left">
+                    <ons-radio name="role" input-id="rd-2"></ons-radio>
+                </label>
+                <label for="rd-2" class="center">
+                    Teacher
+                </label>
+            </ons-list-item>
+        </ons-list>
+        <ons-button onclick="onRegisterBtnClicked()" modifier="large">Register</ons-button>
+    </form>
+    <ons-modal>
+        <div style="text-align: center">
+            <ons-icon icon="md-spinner" style="color: white;" size="80px" spin></ons-icon>
+        </div>
+      </ons-modal>
+</ons-page>
