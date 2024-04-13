@@ -20,10 +20,12 @@ ons-button:hover {
 }
 
 .toast {
-  background-color: red !important; /* Set background to black */
-  color: white !important; /* Set text color to white */
+  background-color: red !important;
+  color: white !important; 
 }
 
 .toast__message {
-  color: inherit !important; /* Ensure the text color inherits from the parent element */
+  color: inherit !important;
 }
+
+

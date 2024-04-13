@@ -57,12 +57,14 @@ document.addEventListener("show", function (event) {
     }
     if (page.id === 'recipeDetailsPage') {
         var recipe = page.data.recipe;
+        console.log(recipe)
         page.querySelector('.title').textContent = recipe.title;
         page.querySelector('img').setAttribute('src', recipe.imageUrl);
         page.querySelectorAll('p')[0].textContent = `Servings: ${recipe.servings}`;
         page.querySelectorAll('p')[1].textContent = `Prep Time: ${recipe.prepTime}`;
         page.querySelectorAll('p')[2].textContent = `Cook Time: ${recipe.cookTime}`;
-        page.querySelectorAll('p')[3].textContent = `Freeze Time: ${recipe.freezeTime}`;
+        console.log(recipe.freezeTime)
+    
     
         const ingredientsList = page.querySelector('ul');
         recipe.ingredients.forEach(ingredient => {
@@ -108,11 +110,18 @@ document.addEventListener("show", function (event) {
   }
 
   function filterRecipes(event) {
-    const searchText = event.target.value.toLowerCase();
-    dbIndexedDB.recipes.toArray().then(recipes => {
-        const filteredRecipes = recipes.filter(recipe => recipe.title.toLowerCase().includes(searchText));
-        displayRecipes(filteredRecipes);
-    });
+  const searchText = event.target.value.toLowerCase().split(/\s*,\s*/); 
+  dbIndexedDB.recipes.toArray().then(recipes => {
+      const filteredRecipes = recipes.filter(recipe =>
+          recipe.title.toLowerCase().includes(searchText[0]) || 
+          searchText.every(term => 
+              recipe.ingredients.some(ingredient => 
+                  ingredient.toLowerCase().includes(term)
+              )
+          )
+      );
+      displayRecipes(filteredRecipes);
+  });
 }
 
   function displayRecipes(recipes) {
