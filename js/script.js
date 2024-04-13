@@ -1,6 +1,7 @@
 import { getFirestore } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 import {
   getAuth,
+  onAuthStateChanged,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
 } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
@@ -20,7 +21,12 @@ if ("serviceWorker" in navigator) {
 document.addEventListener("show", function (event) {
   var page = event.target;
 
+  if (page.id === "splashPage") {
+    checkLoginStatus();
+  }
   if (page.id === "registerPage") {
+
+
     console.log("Register page is now visible");
     var registerButton = page.querySelector("#registerButton");
     var goToLoginButton = page.querySelector("#goToLoginButton");
@@ -43,6 +49,18 @@ document.addEventListener("show", function (event) {
     goToRegisterButton.addEventListener("click", onGoToRegisterBtnClicked);
   }
 });
+
+function checkLoginStatus() {
+  
+  onAuthStateChanged(auth, user => {
+    const navigator = document.getElementById("myNavigator");
+    if (user) {
+      navigator.resetToPage('pages/home.html', { animation: 'fade' });
+    } else {
+      navigator.resetToPage('pages/login.html', { animation: 'fade' });
+    }
+  });
+}
 
 function onRegisterBtnClicked() {
   console.log("Register button clicked!");
