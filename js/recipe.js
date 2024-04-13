@@ -14,14 +14,10 @@ export class RecipeDatabase {
       this.collectionName = "recipes";
     }
   
-    async addSong(title, artist) {
+    async addRecipe(recipeData) {
       try {
         const dbCollection = collection(this.db, this.collectionName);
-        const docRef = await addDoc(dbCollection, {
-          title: title,
-          artist: artist,
-          likes: 0,
-        });
+        const docRef = await addDoc(dbCollection, recipeData);
         return docRef.id;
       } catch (error) {
       }
@@ -37,6 +33,15 @@ export class RecipeDatabase {
         }));
       } catch (error) {
       }
+    }
+
+    async fetchRecipes() {
+      const querySnapshot = await getDocs(collection(this.db, "recipes"));
+      const recipes = [];
+      querySnapshot.forEach((doc) => {
+        recipes.push({ id: doc.id, ...doc.data() });
+      });
+      return recipes;
     }
   
     async increaseLikes(songId) {
