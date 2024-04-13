@@ -409,36 +409,7 @@ function startRecipeBtnClicked(prepTime, recipeTitle, recipe) {
 
         }, 1000);
       }else{
-        onAuthStateChanged(auth, (user) => {
-          if (user) {
-            recipeDB.setActiveRecipe(recipe, user.uid)
-              .then((isSuccess) => {
-                if(isSuccess){
-                  const timeoutId = setTimeout(() => {
-                    const options = {
-                      body: `Your prep timer for ${recipeTitle} has started.`,
-                      icon: "icons/manifest-icon-192.maskable.png",
-                      image: "images/logo.png",
-                    };
-                    navigator.serviceWorker.ready.then((registration) => {
-                      registration.showNotification("Prep Time Reminder", options);
-                    });
-                    const nah = document.getElementById("myNavigator");
-                    nah.popPage();
-                  }, 1000);
-                  
-                  scheduleNotification(timeoutId);
-                  
-                  
-                }
-              })
-              .catch((error) => {
-                console.error("Error setting active recipe:", error);
-              });
-          } else {
-            console.log("User is signed out");
-          }
-        });
+        setActiveRecipeInFirestore(recipe)
       }
      
 
@@ -446,6 +417,39 @@ function startRecipeBtnClicked(prepTime, recipeTitle, recipe) {
   } else {
     console.log("Browser does not support notifications or service workers.");
   }
+}
+
+async function setActiveRecipeInFirestore(newRecipeData) {
+  onAuthStateChanged(auth, (user) => {
+    if (user) {
+      recipeDB.setActiveRecipe(newRecipeData, user.uid)
+        .then((isSuccess) => {
+          if(isSuccess){
+            const timeoutId = setTimeout(() => {
+              const options = {
+                body: `Your prep timer for ${newRecipeData.title} has started.`,
+                icon: "icons/manifest-icon-192.maskable.png",
+                image: "images/logo.png",
+              };
+              navigator.serviceWorker.ready.then((registration) => {
+                registration.showNotification("Prep Time Reminder", options);
+              });
+              const nah = document.getElementById("myNavigator");
+              nah.popPage();
+            }, 1000);
+            
+            scheduleNotification(timeoutId);
+            
+          
+          }
+        })
+        .catch((error) => {
+          console.error("Error setting active recipe:", error);
+        });
+    } else {
+      console.log("User is signed out");
+    }
+  });
 }
 
 async function setActiveRecipeInIndexedDB(newRecipeData, userId) {

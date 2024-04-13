@@ -83,4 +83,12 @@ async function sendMessageToClient(message) {
   });
 }
 
+self.addEventListener('sync', function(event) {
+  if (event.tag == 'active-recipe-sync') {
+      event.waitUntil(syncActiveRecipe());
+  }
+});
 
+
+async function syncActiveRecipe() {
+}
