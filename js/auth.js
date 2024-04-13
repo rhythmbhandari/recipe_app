@@ -17,35 +17,44 @@ let dbIndexedDB;
 let timeouts = [];
 
 function initIndexedDB() {
-  const request = window.indexedDB.open("RecipesDB", 1);
+  const request = window.indexedDB.open("RecipesDB", 2); // Make sure to update the version if schema changes
 
-  request.onerror = function (event) {
+  request.onerror = function(event) {
     console.error("Database error:", event.target.error);
   };
 
-  request.onupgradeneeded = function (event) {
-    const inDb = event.target.result;
-    inDb.onerror = function (event) {
+  request.onupgradeneeded = function(event) {
+    const db = event.target.result;
+
+    // Create the "recipes" object store with an auto-incrementing key
+    if (!db.objectStoreNames.contains('recipes')) {
+      const recipesStore = db.createObjectStore("recipes", {
+        keyPath: "id",
+        autoIncrement: true
+      });
+      recipesStore.createIndex("title", "title", { unique: false });
+    }
+
+    // Create the "activeRecipe" object store using userId as the key path
+    if (!db.objectStoreNames.contains('activeRecipe')) {
+      db.createObjectStore('activeRecipe', { keyPath: 'userId' });
+    }
+
+    db.onerror = function(event) {
       console.error("Database error:", event.target.error);
     };
-
-    const store = inDb.createObjectStore("recipes", {
-      keyPath: "id",
-      autoIncrement: true,
-    });
-    store.createIndex("title", "title", { unique: false });
   };
 
-  request.onsuccess = function (event) {
+  request.onsuccess = function(event) {
     dbIndexedDB = event.target.result;
     console.log("Database initialized successfully");
 
-    dbIndexedDB.onerror = function (event) {
+    dbIndexedDB.onerror = function(event) {
       console.error("Database error:", event.target.error);
     };
   };
 
-  request.onerror = function (event) {
+  request.onerror = function(event) {
     console.error("Database error:", event.target.error);
   };
 }
@@ -158,19 +167,27 @@ document.addEventListener("show", function (event) {
     });
   }
   if (page.id === 'activeRecipe') {
-    loadActiveRecipe(); 
+    loadActiveRecipe();   
 }
 });
 
 async function loadActiveRecipe() {
-  // const auth = getAuth();
 
   const userId = auth.currentUser.uid; 
-
-  const recipe = await recipeDB.getActiveRecipe(db, userId);
+  let recipe;
   const contentElement = document.getElementById('activeRecipeContent');
 
-  if (recipe) {
+  const isOnline = navigator.onLine;
+  console.log( "isOnline: ", isOnline)
+    if (isOnline) {
+        console.log("Online: Fetching from Firestore");
+        recipe = await recipeDB.getActiveRecipe(db, userId);
+    } else {
+        console.log("Offline: Fetching from IndexedDB");
+        recipe = await fetchActiveReceipeFromCache(userId);
+    }
+
+    if (recipe) {
       contentElement.innerHTML = `
           <ons-card>
               <img src="${recipe.imageUrl}" alt="Recipe Image" class="recipe-image">
@@ -186,6 +203,33 @@ async function loadActiveRecipe() {
   } else {
       contentElement.innerHTML = '<p>No active recipe. Start cooking to see something here!</p>';
   }
+}
+
+async function fetchActiveReceipeFromCache(userId) {
+  const transaction = dbIndexedDB.transaction(["activeRecipe"], "readwrite");
+  const store = transaction.objectStore("activeRecipe");
+
+  const request = store.get(userId);
+
+  return new Promise((resolve, reject) => {
+    request.onsuccess = () => {
+        if (request.result) {
+            resolve(request.result.recipe);
+        } else {
+            resolve(null);
+        }
+    };
+    request.onerror = () => {
+        reject("Failed to retrieve from IndexedDB.");
+    };
+});
+  // request.onsuccess = function () {
+  //   displayRecipes(request.result);
+  // };
+
+  // request.onerror = function (event) {
+  //   console.error("IndexedDB read error:", event.target.errorCode);
+  // };
 }
 
 //recipeDB.fetchRecipes().then(displayRecipes);
@@ -348,46 +392,67 @@ function startRecipeBtnClicked(prepTime, recipeTitle, recipe) {
 
       cancelAllNotifications();
 
-      onAuthStateChanged(auth, (user) => {
-        if (user) {
-          // User is signed in, see docs for a list of available properties
-          // https://firebase.google.com/docs/reference/js/auth.user
-          console.log("User is signed in:", user.uid);
+      if(!navigator.onLine){
+        setActiveRecipeInIndexedDB(recipe, auth.currentUser.uid);
+        const timeoutId = setTimeout(() => {
+          const options = {
+            body: `Your prep timer for ${recipeTitle} has started.`,
+            icon: "icons/manifest-icon-192.maskable.png",
+            image: "images/logo.png",
+          };
+          navigator.serviceWorker.ready.then((registration) => {
+            registration.showNotification("Prep Time Reminder", options);
+          });
+          const nah = document.getElementById("myNavigator");
+          nah.popPage();
+          scheduleNotification(timeoutId);
 
-          recipeDB.setActiveRecipe(recipe, user.uid)
-            .then((isSuccess) => {
-              if(isSuccess){
-                const timeoutId = setTimeout(() => {
-                  const options = {
-                    body: `Your prep timer for ${recipeTitle} has started.`,
-                    icon: "icons/manifest-icon-192.maskable.png",
-                    image: "images/logo.png",
-                  };
-                  navigator.serviceWorker.ready.then((registration) => {
-                    registration.showNotification("Prep Time Reminder", options);
-                  });
-                  const nah = document.getElementById("myNavigator");
-                  nah.popPage();
-                }, 1000);
-                
-                scheduleNotification(timeoutId);
-                
-                
-              }
-            })
-            .catch((error) => {
-              console.error("Error setting active recipe:", error);
-            });
-        } else {
-          // User is signed out
-          console.log("User is signed out");
-        }
-      });
+        }, 1000);
+      }else{
+        onAuthStateChanged(auth, (user) => {
+          if (user) {
+            recipeDB.setActiveRecipe(recipe, user.uid)
+              .then((isSuccess) => {
+                if(isSuccess){
+                  const timeoutId = setTimeout(() => {
+                    const options = {
+                      body: `Your prep timer for ${recipeTitle} has started.`,
+                      icon: "icons/manifest-icon-192.maskable.png",
+                      image: "images/logo.png",
+                    };
+                    navigator.serviceWorker.ready.then((registration) => {
+                      registration.showNotification("Prep Time Reminder", options);
+                    });
+                    const nah = document.getElementById("myNavigator");
+                    nah.popPage();
+                  }, 1000);
+                  
+                  scheduleNotification(timeoutId);
+                  
+                  
+                }
+              })
+              .catch((error) => {
+                console.error("Error setting active recipe:", error);
+              });
+          } else {
+            console.log("User is signed out");
+          }
+        });
+      }
+     
 
     }
   } else {
     console.log("Browser does not support notifications or service workers.");
   }
+}
+
+async function setActiveRecipeInIndexedDB(newRecipeData, userId) {
+  const transaction = dbIndexedDB.transaction(["activeRecipe"], "readwrite");
+  const store = transaction.objectStore("activeRecipe");
+  let dd = { userId: userId, recipe: newRecipeData };
+  store.put(dd);  
 }
 
 function onGoToRegisterBtnClicked() {

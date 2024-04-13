@@ -63,7 +63,6 @@ self.addEventListener("fetch", (event) => {
   }
 });
 
-
 self.addEventListener("notificationclick", (event) => {
   const notification = event.notification;
   const action = event.action;
@@ -83,3 +82,5 @@ async function sendMessageToClient(message) {
     client.postMessage(message);
   });
 }
+
+
