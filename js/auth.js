@@ -98,7 +98,11 @@ document.addEventListener("show", function (event) {
         page.querySelectorAll('p')[0].textContent = `Servings: ${recipe.servings}`;
         page.querySelectorAll('p')[1].textContent = `Prep Time: ${recipe.prepTime}`;
         page.querySelectorAll('p')[2].textContent = `Cook Time: ${recipe.cookTime}`;
-        console.log(recipe.freezeTime)
+        if(recipe.freezeTime == null){
+          page.querySelectorAll('p')[3].textContent = `Freeze Time: 0`;
+        }else{
+          page.querySelectorAll('p')[3].textContent = `Freeze Time: ${recipe.cookTime}`;
+        }
     
     
         const ingredientsList = page.querySelector('ul');
@@ -207,30 +211,21 @@ document.addEventListener("show", function (event) {
   }
 
   function checkLoginStatus() {
-    console.log("Did we reach here?")
-    if (!navigator.onLine) {
+    onAuthStateChanged(auth, user => {
       const navigator = document.getElementById("myNavigator");
-
-      navigator.resetToPage('pages/home.html', { animation: 'fade' });
-    } else {
-      onAuthStateChanged(auth, user => {
-        const navigator = document.getElementById("myNavigator");
-        console.log("User is ", user)
-        if (user) {
-          navigator.resetToPage('pages/home.html', { animation: 'fade' });
-        } else {
-          navigator.resetToPage('pages/login.html', { animation: 'fade' });
-        }
-      });
-    }
-    
+      console.log("User is ", user)
+      if (user) {
+        navigator.resetToPage('pages/main.html', { animation: 'fade' });
+      } else {
+        navigator.resetToPage('pages/login.html', { animation: 'fade' });
+      }
+    });
   }
   
   function onRegisterBtnClicked() {
     console.log("Register button clicked!");
     const email = document.getElementById("new-email").value;
     const password = document.getElementById("new-password").value;
-    // var role = document.querySelector('input[name="role"]:checked').id;
     var mod = document.querySelector("ons-modal");
   
     mod.show();
@@ -239,7 +234,7 @@ document.addEventListener("show", function (event) {
         const user = userCredential.user;
         console.log(user);
         const navigator = document.getElementById("myNavigator");
-        navigator.pushPage("pages/home.html");
+        navigator.pushPage("pages/main.html");
         mod.hide();
       })
       .catch((error) => {
@@ -277,7 +272,7 @@ document.addEventListener("show", function (event) {
         const user = userCredential.user;
         console.log("Logged in as:", user.email);
         const navigator = document.getElementById("myNavigator");
-        navigator.pushPage("pages/home.html");
+        navigator.pushPage("pages/main.html");
         mod.hide();
       })
       .catch((error) => {

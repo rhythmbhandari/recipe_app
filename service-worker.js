@@ -1,4 +1,4 @@
-const cacheName = "cacheAssets-v1";
+const cacheName = "cacheAssets-v3";
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
@@ -9,6 +9,10 @@ self.addEventListener("install", (event) => {
         cache.addAll([
           "/",
           "/index.html",
+          "/pages/detail.html",
+          "/pages/main.html",
+          "/pages/home.html",
+          "/pages/activeRecipe.html",
           "/css/styles.css",
           "css/onsenui/onsenui.css",
           "css/onsenui/onsen-css-components.css",
@@ -44,17 +48,15 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   if (event.request.method === "GET") {
     event.respondWith(
-      caches.match(event.request).then((response) => {
-        if (response) {
-          return response;
-        }
-
-        return fetch(event.request).then((networkResponse) => {
-          return caches.open(cacheName).then((cache) => {
-            cache.put(event.request, networkResponse.clone());
-            return networkResponse;
-          });
-        }).catch(() => {
+      caches.open(cacheName).then((cache) => {
+        return cache.match(event.request).then((cachedResponse) => {
+          const fetchedResponse = fetch(event.request)
+            .then((networkResponse) => {
+              cache.put(event.request, networkResponse.clone());
+              return networkResponse;
+            })
+            .catch(() => {});
+          return cachedResponse || fetchedResponse;
         });
       })
     );
