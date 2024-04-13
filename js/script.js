@@ -13,9 +13,13 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("/service-worker.js").catch((_) => {});
   });
+  navigator.serviceWorker.addEventListener(
+    "message",
+    handleNotificationMessage
+  );
 }
 
-function onHomeBtnClicked() {
-  const navigator = document.getElementById("myNavigator");
-  navigator.pushPage("pages/detail.html");
+function handleNotificationMessage(event) {
+  const message = event.data;
+  console.log(`Message is ${message}`)
 }

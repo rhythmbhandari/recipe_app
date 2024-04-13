@@ -1,60 +1,63 @@
 import {
-    collection,
-    addDoc,
-    getDocs,
-    doc,
-    getDoc,
-    updateDoc,
-    deleteDoc,
-  } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
-  
-export class RecipeDatabase {
-    constructor(db) {
-      this.db = db;
-      this.collectionName = "recipes";
-    }
-  
-    async addRecipe(recipeData) {
-      try {
-        const dbCollection = collection(this.db, this.collectionName);
-        const docRef = await addDoc(dbCollection, recipeData);
-        return docRef.id;
-      } catch (error) {
-      }
-    }
+  collection,
+  addDoc,
+  setDoc,
+  getDocs,
+  doc,
+  getDoc,
+  updateDoc,
+  deleteDoc,
+} from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
-    async fetchRecipes() {
-      const querySnapshot = await getDocs(collection(this.db, "recipes"));
-      const recipes = [];
-      querySnapshot.forEach((doc) => {
-        recipes.push({ id: doc.id, ...doc.data() });
-      });
-      return recipes;
-    }
-  
-    async increaseLikes(songId) {
-      const songRef = doc(this.db, this.collectionName, songId);
-  
-      try {
-        const docSnap = await getDoc(songRef);
-        const currentLikes = docSnap.data().likes;
-  
-        await updateDoc(songRef, {
-          likes: currentLikes + 1,
-        });
-  
-        return true;
-      } catch (error) {
-      }
-    }
-  
-    async removeSong(songId) {
-      const songRef = doc(this.db, this.collectionName, songId);
-  
-      try {
-        await deleteDoc(songRef);
-        return true;
-      } catch (error) {
-      }
+export class RecipeDatabase {
+  constructor(db) {
+    this.db = db;
+    this.collectionName = "recipes";
+  }
+
+  async setActiveRecipe(newRecipeData, userId) {
+    const docRef = doc(this.db, "activeRecipes", userId);
+    try {
+      await setDoc(docRef, newRecipeData);
+      return true;
+    } catch (error) {
+      console.error("Error setting active recipe:", error);
+      return false;
     }
   }
+
+  async fetchRecipes() {
+    const querySnapshot = await getDocs(collection(this.db, "recipes"));
+    const recipes = [];
+    querySnapshot.forEach((doc) => {
+      recipes.push({ id: doc.id, ...doc.data() });
+    });
+    return recipes;
+  }
+
+  async  getActiveRecipe(db, userId) {
+    const docRef = doc(db, "activeRecipes", userId);
+    try {
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+            console.log("Active recipe data:", docSnap.data());
+            return docSnap.data();
+        } else {
+            console.log("No active recipe found.");
+            return null;
+        }
+    } catch (error) {
+        console.error("Error fetching active recipe:", error);
+        return null;
+    }
+}
+
+  async removeSong(songId) {
+    const songRef = doc(this.db, this.collectionName, songId);
+
+    try {
+      await deleteDoc(songRef);
+      return true;
+    } catch (error) {}
+  }
+}

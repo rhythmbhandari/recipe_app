@@ -62,3 +62,24 @@ self.addEventListener("fetch", (event) => {
     );
   }
 });
+
+
+self.addEventListener("notificationclick", (event) => {
+  const notification = event.notification;
+  const action = event.action;
+
+  if (action === "agree") {
+    sendMessageToClient("So we both agree on that!");
+  } else if (action === "disagree") {
+    sendMessageToClient("Let's agree to disagree.");
+  }
+
+  notification.close();
+});
+
+async function sendMessageToClient(message) {
+  const clients = await self.clients.matchAll();
+  clients.forEach((client) => {
+    client.postMessage(message);
+  });
+}
