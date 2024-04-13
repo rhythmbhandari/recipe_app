@@ -1,0 +1,22 @@
+<ons-page id="loginPage">
+    <ons-toolbar>
+        <div class="center">Login</div>
+    </ons-toolbar>
+    <form>
+        <label>Email:</label>
+        <ons-input id="login-email" type="email" placeholder="Enter your email" modifier="underbar" float
+            style="margin-top: 10px; margin-bottom: 10px;"></ons-input>
+        <label>Password:</label>
+        <ons-input id="login-password" type="password" placeholder="Enter your password" modifier="underbar" float
+            style="margin-top: 10px; margin-bottom: 20px;"></ons-input>
+        <ons-button id="loginButton" modifier="large">Login</ons-button>
+        <p style="text-align: center; margin-top: 20px;">
+            <ons-button modifier="quiet" id="goToRegisterButton">Don't have an account? Register</ons-button>
+        </p>
+    </form>
+    <ons-modal>
+        <div style="text-align: center">
+            <ons-icon icon="md-spinner" style="color: white;" size="80px" spin></ons-icon>
+        </div>
+    </ons-modal>
+</ons-page>
