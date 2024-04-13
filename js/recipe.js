@@ -22,18 +22,6 @@ export class RecipeDatabase {
       } catch (error) {
       }
     }
-  
-    async getSongList() {
-      try {
-        const dbCollection = collection(this.db, this.collectionName);
-        const querySnapshot = await getDocs(dbCollection);
-        return querySnapshot.docs.map((doc) => ({
-          id: doc.id,
-          data: doc.data(),
-        }));
-      } catch (error) {
-      }
-    }
 
     async fetchRecipes() {
       const querySnapshot = await getDocs(collection(this.db, "recipes"));

@@ -1,0 +1,24 @@
+<ons-page id="recipeDetailsPage">
+    <ons-toolbar>
+      <div class="left"><ons-back-button>Back</ons-back-button></div>
+      <div class="center">Recipe Details</div>
+    </ons-toolbar>
+    <div class="content">
+      <ons-card>
+        <img src="{{imageUrl}}" alt="Recipe Image" style="width: 50%;">
+        <div class="title">{{title}}</div>
+        <div class="content">
+          <p><strong>Servings:</strong> {{servings}}</p>
+          <p><strong>Prep Time:</strong> {{prepTime}}</p>
+          <p><strong>Cook Time:</strong> {{cookTime}}</p>
+          <p><strong>Freeze Time:</strong> {{freezeTime}}</p>
+          <p><strong>Ingredients:</strong></p>
+          <ul id="ingredients">
+          </ul>
+          <p><strong>Instructions:</strong></p>
+          <ol id="instructions">
+          </ol>
+        </div>
+      </ons-card>
+    </div>
+  </ons-page>
