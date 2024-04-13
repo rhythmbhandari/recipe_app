@@ -19,6 +19,9 @@ self.addEventListener("install", (event) => {
           "/js/script.js",
           "icons/favicon-196.png",
           "icons/manifest-icon-192.maskable.png",
+          "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js",
+          "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js",
+          "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js"
         ]);
       })
       .catch((_error) => {})
@@ -41,15 +44,17 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   if (event.request.method === "GET") {
     event.respondWith(
-      caches.open(cacheName).then((cache) => {
-        return cache.match(event.request).then((cachedResponse) => {
-          const fetchedResponse = fetch(event.request)
-            .then((networkResponse) => {
-              cache.put(event.request, networkResponse.clone());
-              return networkResponse;
-            })
-            .catch(() => {});
-          return cachedResponse || fetchedResponse;
+      caches.match(event.request).then((response) => {
+        if (response) {
+          return response;
+        }
+
+        return fetch(event.request).then((networkResponse) => {
+          return caches.open(cacheName).then((cache) => {
+            cache.put(event.request, networkResponse.clone());
+            return networkResponse;
+          });
+        }).catch(() => {
         });
       })
     );

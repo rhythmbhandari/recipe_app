@@ -14,10 +14,45 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const recipeDB = new RecipeDatabase(db);
-const dbIndexedDB = new Dexie('RecipesDB');
-dbIndexedDB.version(1).stores({
-    recipes: '++id, title, ingredients, instructions, prepTime, cookTime, freezeTime, servings, category, imageUrl, likes'
-  });
+let dbIndexedDB;
+
+
+function initIndexedDB() {
+  const request = window.indexedDB.open('RecipesDB', 1);
+
+  request.onerror = function(event) {
+      console.error('Database error:', event.target.error);
+  };
+
+  request.onupgradeneeded = function(event) {
+      const inDb = event.target.result;
+      inDb.onerror = function(event) {
+          console.error('Database error:', event.target.error);
+      };
+
+      const store = inDb.createObjectStore('recipes', { keyPath: 'id', autoIncrement: true });
+      store.createIndex('title', 'title', { unique: false });
+  };
+
+  request.onsuccess = function(event) {
+    dbIndexedDB = event.target.result;
+    console.log('Database initialized successfully');
+
+    dbIndexedDB.onerror = function(event) {
+        console.error('Database error:', event.target.error);
+    };
+  };
+
+  request.onerror = function(event) {
+    console.error('Database error:', event.target.error);
+};
+}
+
+if (document.readyState === "complete" || document.readyState === "interactive") {
+  initIndexedDB(); 
+} else {
+  document.addEventListener('DOMContentLoaded', initIndexedDB); 
+}
 
 document.addEventListener("show", function (event) {
     var page = event.target;
@@ -92,16 +127,31 @@ document.addEventListener("show", function (event) {
     }
   }
   async function fetchFromCache() {
-    const cachedRecipes = await dbIndexedDB.recipes.toArray();
-    displayRecipes(cachedRecipes);
+    const transaction = dbIndexedDB.transaction(['recipes'], 'readonly');
+    const store = transaction.objectStore('recipes');
+    const request = store.getAll();
+  
+    request.onsuccess = function() {
+      displayRecipes(request.result);
+    };
+  
+    request.onerror = function(event) {
+      console.error("IndexedDB read error:", event.target.errorCode);
+    };
   }
 
 
   async function fetchAndCacheRecipes() {
     try {
         const recipes = await recipeDB.fetchRecipes();
-        await dbIndexedDB.recipes.bulkPut(recipes);
-        displayRecipes(recipes);
+        const transaction = dbIndexedDB.transaction(['recipes'], 'readwrite');
+        const store = transaction.objectStore('recipes');
+        recipes.forEach(recipe => {
+          store.put(recipe);
+        });
+        transaction.oncomplete = function() {
+          displayRecipes(recipes);
+        };
 
     } catch (error) {
       console.error("Error fetching from Firebase, trying cache", error);
@@ -111,17 +161,22 @@ document.addEventListener("show", function (event) {
 
   function filterRecipes(event) {
   const searchText = event.target.value.toLowerCase().split(/\s*,\s*/); 
-  dbIndexedDB.recipes.toArray().then(recipes => {
-      const filteredRecipes = recipes.filter(recipe =>
-          recipe.title.toLowerCase().includes(searchText[0]) || 
-          searchText.every(term => 
-              recipe.ingredients.some(ingredient => 
-                  ingredient.toLowerCase().includes(term)
-              )
-          )
-      );
-      displayRecipes(filteredRecipes);
-  });
+  const transaction = dbIndexedDB.transaction(['recipes'], 'readonly');
+  const store = transaction.objectStore('recipes');
+  const request = store.getAll();
+
+  request.onsuccess = function() {
+    const recipes = request.result;
+    const filteredRecipes = recipes.filter(recipe =>
+      recipe.title.toLowerCase().includes(searchText[0]) || 
+      searchText.every(term => 
+        recipe.ingredients.some(ingredient => 
+          ingredient.toLowerCase().includes(term)
+        )
+      )
+    );
+    displayRecipes(filteredRecipes);
+  };
 }
 
   function displayRecipes(recipes) {
@@ -152,14 +207,23 @@ document.addEventListener("show", function (event) {
   }
 
   function checkLoginStatus() {
-    onAuthStateChanged(auth, user => {
+    console.log("Did we reach here?")
+    if (!navigator.onLine) {
       const navigator = document.getElementById("myNavigator");
-      if (user) {
-        navigator.resetToPage('pages/home.html', { animation: 'fade' });
-      } else {
-        navigator.resetToPage('pages/login.html', { animation: 'fade' });
-      }
-    });
+
+      navigator.resetToPage('pages/home.html', { animation: 'fade' });
+    } else {
+      onAuthStateChanged(auth, user => {
+        const navigator = document.getElementById("myNavigator");
+        console.log("User is ", user)
+        if (user) {
+          navigator.resetToPage('pages/home.html', { animation: 'fade' });
+        } else {
+          navigator.resetToPage('pages/login.html', { animation: 'fade' });
+        }
+      });
+    }
+    
   }
   
   function onRegisterBtnClicked() {
