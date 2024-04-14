@@ -35,6 +35,17 @@ export class RecipeDatabase {
     return recipes;
   }
 
+
+  async fetchCompleted() {
+    const querySnapshot = await getDocs(collection(this.db, "completed"));
+    const completed = [];
+    querySnapshot.forEach((doc) => {
+      completed.push({ id: doc.id, ...doc.data() });
+    });
+    return completed;
+  }
+
+
   async  getActiveRecipe(db, userId) {
     const docRef = doc(db, "activeRecipes", userId);
     try {
@@ -52,12 +63,35 @@ export class RecipeDatabase {
     }
 }
 
-  async removeSong(songId) {
-    const songRef = doc(this.db, this.collectionName, songId);
 
-    try {
-      await deleteDoc(songRef);
-      return true;
-    } catch (error) {}
+async completeAndDeleteActiveRecipe(userId, location) {
+  console.log(userId, location)
+  const docRef = doc(this.db, "activeRecipes", userId);
+  try {
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+          const { instructions, ingredients, likes, ...restOfData } = docSnap.data();
+
+          const completedDocRef = collection(this.db, "completed") 
+
+          await addDoc(completedDocRef, {
+              ...restOfData,
+              completedAt: new Date(),
+              coordinates: location
+          });
+          console.log("Recipe added to completed recipes.");
+
+          await deleteDoc(docRef);
+          console.log("Active recipe deleted successfully.");
+          return true;
+      } else {
+          console.log("No active recipe found to complete or delete.");
+          return false;
+      }
+  } catch (error) {
+      console.error("Error in completing and deleting active recipe:", error);
+      return false;
   }
+}
+
 }

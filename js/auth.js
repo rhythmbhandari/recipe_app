@@ -15,9 +15,10 @@ const db = getFirestore(app);
 const recipeDB = new RecipeDatabase(db);
 let dbIndexedDB;
 let timeouts = [];
+let wakeLock = null;
 
 function initIndexedDB() {
-  const request = window.indexedDB.open("RecipesDB", 2); // Make sure to update the version if schema changes
+  const request = window.indexedDB.open("RecipesDB", 3); // Make sure to update the version if schema changes
 
   request.onerror = function (event) {
     console.error("Database error:", event.target.error);
@@ -26,7 +27,6 @@ function initIndexedDB() {
   request.onupgradeneeded = function (event) {
     const db = event.target.result;
 
-    // Create the "recipes" object store with an auto-incrementing key
     if (!db.objectStoreNames.contains("recipes")) {
       const recipesStore = db.createObjectStore("recipes", {
         keyPath: "id",
@@ -35,7 +35,10 @@ function initIndexedDB() {
       recipesStore.createIndex("title", "title", { unique: false });
     }
 
-    // Create the "activeRecipe" object store using userId as the key path
+    if (!db.objectStoreNames.contains("completed")) {
+      db.createObjectStore("completed", { keyPath: "userId" });
+    }
+
     if (!db.objectStoreNames.contains("activeRecipe")) {
       db.createObjectStore("activeRecipe", { keyPath: "userId" });
     }
@@ -70,9 +73,10 @@ if (
 
 navigator.serviceWorker.ready.then(function (registration) {
   if (registration.sync) {
-    registration.sync.register("active-recipe-sync")
+    registration.sync
+      .register("active-recipe-sync")
       .then(() => updateRecipesInFirestore())
-      .catch(error => console.error("Failed to register sync:", error));
+      .catch((error) => console.error("Failed to register sync:", error));
   }
 });
 
@@ -90,12 +94,11 @@ async function updateRecipesInFirestore() {
 
 function openIndexedDB() {
   return new Promise((resolve, reject) => {
-    const request = window.indexedDB.open("RecipesDB", 2);
+    const request = window.indexedDB.open("RecipesDB", 3);
     request.onerror = () => reject("Failed to open IndexedDB");
-    request.onsuccess = event => resolve(event.target.result);
+    request.onsuccess = (event) => resolve(event.target.result);
   });
 }
-
 
 function getRecipesFromIndexedDB(db) {
   return new Promise((resolve, reject) => {
@@ -110,12 +113,27 @@ function getRecipesFromIndexedDB(db) {
 
 async function updateRecipeInFirestore(recipe) {
   try {
-    console.log(recipe.sync)
-    if(recipe.sync != undefined && recipe.sync == false){
-      const isSuccess = await recipeDB.setActiveRecipe(recipe.recipe, recipe.userId);
+    console.log(recipe.sync);
+    if (recipe.location != undefined || recipe.location != null) {
+      const isSuccess = await recipeDB.completeAndDeleteActiveRecipe(
+        recipe.userId,
+        recipe.location
+      );
       if (isSuccess) {
         console.log("Recipe successfully updated in Firestore:", recipe.recipe);
-        setActiveRecipeInIndexedDB(recipe.recipe, recipe.userId, true);
+        setActiveRecipeInIndexedDB(recipe.recipe, recipe.userId, true, false);
+      } else {
+        throw new Error("Failed to update recipe in Firestore");
+      }
+    }
+    if (recipe.sync != undefined && recipe.sync == false) {
+      const isSuccess = await recipeDB.setActiveRecipe(
+        recipe.recipe,
+        recipe.userId
+      );
+      if (isSuccess) {
+        console.log("Recipe successfully updated in Firestore:", recipe.recipe);
+        setActiveRecipeInIndexedDB(recipe.recipe, recipe.userId, true, false);
       } else {
         throw new Error("Failed to update recipe in Firestore");
       }
@@ -157,7 +175,6 @@ document.addEventListener("show", function (event) {
     var registerButton = page.querySelector("#registerButton");
     var goToLoginButton = page.querySelector("#goToLoginButton");
 
-    // Ensure the event isn't bound multiple times
     registerButton.removeEventListener("click", onRegisterBtnClicked);
     registerButton.addEventListener("click", onRegisterBtnClicked);
 
@@ -175,10 +192,12 @@ document.addEventListener("show", function (event) {
     goToRegisterButton.removeEventListener("click", onGoToRegisterBtnClicked);
     goToRegisterButton.addEventListener("click", onGoToRegisterBtnClicked);
   }
+
   if (page.id === "homePage") {
     checkData();
     page.querySelector("#searchInput").addEventListener("input", filterRecipes);
   }
+
   if (page.id === "recipeDetailsPage") {
     var recipe = page.data.recipe;
     var startCooking = page.querySelector("#start-cooking");
@@ -193,6 +212,7 @@ document.addEventListener("show", function (event) {
     startCooking.removeEventListener("click", () =>
       startRecipeBtnClicked(recipe.title, recipe.prepTime, recipe)
     );
+
     startCooking.addEventListener("click", () =>
       startRecipeBtnClicked(recipe.title, recipe.prepTime, recipe)
     );
@@ -219,12 +239,73 @@ document.addEventListener("show", function (event) {
       instructionsList.appendChild(li);
     });
   }
+
   if (page.id === "activeRecipe") {
-    loadActiveRecipe();
+    var stopRecipe = page.querySelector("#end-cooking");
+    loadActiveRecipe(stopRecipe);
   }
 });
 
-async function loadActiveRecipe() {
+function stopRecipeBtnClicked(recipe) {
+  try{
+    const mod = document.querySelector("ons-modal");
+    mod.show();
+
+  if ("Notification" in window && "serviceWorker" in navigator) {
+    if ("wakeLock" in navigator) {
+      releaseWakeLock();
+    }
+
+    const userId = auth.currentUser.uid;
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const location = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          };
+          if (!navigator.onLine) {
+            setActiveRecipeInIndexedDB(recipe, userId, true, false, location);
+          } else {
+            markRecipeAsCompletedInFirestore(userId, location);
+          }
+
+        mod.hide();
+          
+        var tabbar = document.querySelector("#tabbar");
+        console.log(`Tabbar: ${tabbar}`);
+        if (tabbar) {
+          tabbar.setActiveTab(0);
+        }
+        ons.notification.toast("Thank you for trying our recipe", {
+          timeout: 3000,
+          animation: "fall",
+        });
+        },
+        (error) => {
+          console.error("Error getting location:", error.message);
+        }
+      );
+    } else {
+      console.log("Geolocation is not supported by this browser.");
+    }
+    
+  } else {
+    console.log("Browser does not support notifications or service workers.");
+  }
+  }catch(e){
+    const mod = document.querySelector("ons-modal");
+    mod.hide();
+  }
+}
+
+function assignButtonEventsForStop(stopRecipeBtn) {
+  stopRecipeBtn.removeEventListener("click", () => stopRecipeBtnClicked());
+  stopRecipeBtn.addEventListener("click", () => stopRecipeBtnClicked());
+}
+
+async function loadActiveRecipe(stopRecipeBtn) {
   const userId = auth.currentUser.uid;
   let recipe;
   const contentElement = document.getElementById("activeRecipeContent");
@@ -234,9 +315,11 @@ async function loadActiveRecipe() {
   if (isOnline) {
     console.log("Online: Fetching from Firestore");
     recipe = await recipeDB.getActiveRecipe(db, userId);
+    assignButtonEventsForStop(stopRecipeBtn);
   } else {
     console.log("Offline: Fetching from IndexedDB");
     recipe = await fetchActiveReceipeFromCache(userId);
+    assignButtonEventsForStop(stopRecipeBtn);
   }
 
   if (recipe) {
@@ -256,9 +339,11 @@ async function loadActiveRecipe() {
               </div>
           </ons-card>
       `;
+    stopRecipeBtn.style.display = "block";
   } else {
     contentElement.innerHTML =
       "<p>No active recipe. Start cooking to see something here!</p>";
+    stopRecipeBtn.style.display = "none";
   }
 }
 
@@ -436,6 +521,9 @@ function cancelAllNotifications() {
 
 function startRecipeBtnClicked(prepTime, recipeTitle, recipe) {
   if ("Notification" in window && "serviceWorker" in navigator) {
+    if ("wakeLock" in navigator) {
+      requestWakeLock();
+    }
     if (Notification.permission !== "granted") {
       Notification.requestPermission().then((permission) => {
         if (permission === "granted") {
@@ -450,7 +538,7 @@ function startRecipeBtnClicked(prepTime, recipeTitle, recipe) {
       cancelAllNotifications();
 
       if (!navigator.onLine) {
-        setActiveRecipeInIndexedDB(recipe, auth.currentUser.uid, false);
+        setActiveRecipeInIndexedDB(recipe, auth.currentUser.uid, false, false);
         const timeoutId = setTimeout(() => {
           const options = {
             body: `Your prep timer for ${recipeTitle} has started.`,
@@ -505,10 +593,23 @@ async function setActiveRecipeInFirestore(newRecipeData) {
   });
 }
 
-async function setActiveRecipeInIndexedDB(newRecipeData, userId, sync) {
+async function markRecipeAsCompletedInFirestore(userId, location) {
+      recipeDB
+        .completeAndDeleteActiveRecipe(db, userId, location)
+        .then((isSuccess) => {
+          console.log("Successfully marked as completed:", isSuccess);
+        })
+        .catch((error) => {
+          console.error("Error marking recipe as completed:", error);
+        });
+    
+}
+
+
+async function setActiveRecipeInIndexedDB(newRecipeData, userId, sync, iscompleted, location) {
   const transaction = dbIndexedDB.transaction(["activeRecipe"], "readwrite");
   const store = transaction.objectStore("activeRecipe");
-  let dd = { userId: userId, recipe: newRecipeData, sync: sync};
+  let dd = { userId: userId, recipe: newRecipeData, sync: sync , iscompleted: iscompleted, location: location};
   store.put(dd);
 }
 
@@ -583,3 +684,31 @@ function displayError(errorCode) {
     animation: "fall",
   });
 }
+
+async function requestWakeLock() {
+  try {
+    wakeLock = await navigator.wakeLock.request("screen");
+    console.log("Screen wake lock is active.");
+
+    wakeLock.addEventListener("release", () => {
+      console.log("Screen wake lock was released");
+    });
+  } catch (err) {
+    console.error(`Failed to activate wake lock: ${err.name}, ${err.message}`);
+  }
+}
+
+function releaseWakeLock() {
+  if (wakeLock !== null) {
+    wakeLock.release().then(() => {
+      wakeLock = null;
+      console.log("Screen wake lock has been released");
+    });
+  }
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") {
+    releaseWakeLock();
+  }
+});

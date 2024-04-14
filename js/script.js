@@ -19,6 +19,13 @@ if ("serviceWorker" in navigator) {
   );
 }
 
+
+if ('wakeLock' in navigator) {
+  console.log('Wake Lock API is supported!');
+} else {
+  console.log('Wake Lock API is not supported by this browser.');
+}
+
 function handleNotificationMessage(event) {
   const message = event.data;
   console.log(`Message is ${message}`)
